@@ -1,0 +1,29 @@
+/* styles.css */
+
+.yt-sub-preview-tooltip {
+  position: fixed;
+  z-index: 999999; /* 確保浮於 YouTube 所有原生 Header 與 Modal 之上 */
+  padding: 6px 12px;
+  background-color: rgba(15, 15, 15, 0.92); /* YouTube 暗色風格背景 */
+  color: #f1f1f1;
+  font-family: "Roboto", "Arial", sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  pointer-events: none; /* 關鍵：防止滑鼠游標遮擋或誤觸 Tooltip 本身 */
+
+  /* 進入動畫初始狀態 */
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.15s ease-in-out, transform 0.15s ease-in-out;
+}
+
+/* 動態顯示時的樣式 */
+.yt-sub-preview-tooltip.yt-sub-preview-show {
+  opacity: 1;
+  transform: translateY(0);
+}
