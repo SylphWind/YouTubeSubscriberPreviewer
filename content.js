@@ -151,6 +151,8 @@ function removeTooltip() {
  * 將數值格式化為易讀字串 (如: 1234567 -> 123.4萬)
  */
 function formatSubscriberCount(countStr) {
+  if (countStr == null) return "未公開";
+
   const num = parseInt(countStr, 10);
   if (isNaN(num)) return "未公開";
 
@@ -161,6 +163,8 @@ function formatSubscriberCount(countStr) {
 }
 
 function formatCount(countStr, suffix) {
+  if (countStr == null) return "未公開";
+
   const num = parseInt(countStr, 10);
   if (isNaN(num)) return "未公開";
 

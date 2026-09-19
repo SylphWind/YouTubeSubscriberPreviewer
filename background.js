@@ -79,11 +79,11 @@ async function handleGetSubscriberCount(identifier) {
   const hiddenSubscriberCount = statistics.hiddenSubscriberCount === true;
   const subscriberCount = hiddenSubscriberCount
     ? null
-    : statistics.subscriberCount || null;
-  const country = snippet.country || null;
-  const videoCount = statistics.videoCount || null;
-  const viewCount = statistics.viewCount || null;
-  const publishedAt = snippet.publishedAt || null;
+    : statistics.subscriberCount ?? null;
+  const country = snippet.country ?? null;
+  const videoCount = statistics.videoCount ?? null;
+  const viewCount = statistics.viewCount ?? null;
+  const publishedAt = snippet.publishedAt ?? null;
 
   // --- 步驟 C：將最新數據寫入 chrome.storage 快取 ---
   await chrome.storage.local.set({
