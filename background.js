@@ -3,8 +3,9 @@
 // 1. 請替換為你的 Google Cloud YouTube Data API Key
 const API_KEY = "AIzaSyD6ePkaw8CVap70by11vIhglAKy40M_IlQ"; 
 
-// 2. 設定快取過期時間（預設為 7 天，單位毫秒）
-const CACHE_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
+// 2. 設定各類資料的快取過期時間（單位毫秒）
+const SUBSCRIBER_CACHE_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
+const VIDEO_VIEW_CACHE_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000;
 
 // 監聽來自 Content Script 的訊息
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -35,12 +36,17 @@ async function handleGetSubscriberCount(identifier) {
 
   if (
     cacheEntry &&
-    Object.prototype.hasOwnProperty.call(cacheEntry, "country") &&
-    now - cacheEntry.timestamp < CACHE_EXPIRY_MS
+    hasCompleteChannelData(cacheEntry) &&
+    now - cacheEntry.subscriberCachedAt < SUBSCRIBER_CACHE_EXPIRY_MS &&
+    now - cacheEntry.videoViewCachedAt < VIDEO_VIEW_CACHE_EXPIRY_MS
   ) {
     return {
       subscriberCount: cacheEntry.subscriberCount,
+      hiddenSubscriberCount: cacheEntry.hiddenSubscriberCount,
       country: cacheEntry.country,
+      videoCount: cacheEntry.videoCount,
+      viewCount: cacheEntry.viewCount,
+      publishedAt: cacheEntry.publishedAt,
       fromCache: true
     };
   }
@@ -67,21 +73,52 @@ async function handleGetSubscriberCount(identifier) {
     throw new Error("未找到該頻道的統計資料");
   }
 
-  const subscriberCount = data.items[0].statistics.subscriberCount;
-  const country = data.items[0].snippet?.country || null;
+  const channel = data.items[0];
+  const statistics = channel.statistics || {};
+  const snippet = channel.snippet || {};
+  const hiddenSubscriberCount = statistics.hiddenSubscriberCount === true;
+  const subscriberCount = hiddenSubscriberCount
+    ? null
+    : statistics.subscriberCount ?? null;
+  const country = snippet.country ?? null;
+  const videoCount = statistics.videoCount ?? null;
+  const viewCount = statistics.viewCount ?? null;
+  const publishedAt = snippet.publishedAt ?? null;
 
   // --- 步驟 C：將最新數據寫入 chrome.storage 快取 ---
   await chrome.storage.local.set({
     [identifier]: {
       subscriberCount: subscriberCount,
+      hiddenSubscriberCount: hiddenSubscriberCount,
       country: country,
-      timestamp: now
+      videoCount: videoCount,
+      viewCount: viewCount,
+      publishedAt: publishedAt,
+      subscriberCachedAt: now,
+      videoViewCachedAt: now
     }
   });
 
   return {
     subscriberCount: subscriberCount,
+    hiddenSubscriberCount: hiddenSubscriberCount,
     country: country,
+    videoCount: videoCount,
+    viewCount: viewCount,
+    publishedAt: publishedAt,
     fromCache: false
   };
+}
+
+function hasCompleteChannelData(cacheEntry) {
+  return [
+    "subscriberCount",
+    "hiddenSubscriberCount",
+    "country",
+    "videoCount",
+    "viewCount",
+    "publishedAt",
+    "subscriberCachedAt",
+    "videoViewCachedAt"
+  ].every((field) => Object.prototype.hasOwnProperty.call(cacheEntry, field));
 }
