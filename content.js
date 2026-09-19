@@ -4,6 +4,25 @@ let hoverTimer = null;
 let activeTooltip = null;
 let activeTooltipTarget = null;
 let currentTargetLink = null;
+let previewSettings = {
+  fields: {
+    subscriberCount: true,
+    videoCount: true,
+    viewCount: true,
+    country: true,
+    publishedAt: true
+  }
+};
+
+chrome.runtime.sendMessage({ action: "getPreviewSettings" }, (response) => {
+  if (response?.success) previewSettings = response.settings;
+});
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName === "local" && changes.previewSettings?.newValue) {
+    previewSettings = changes.previewSettings.newValue;
+  }
+});
 
 // 1. 使用全域 mouseover 事件委派，自動相容 YouTube SPA 動態渲染的 DOM
 document.addEventListener("mouseover", (event) => {
@@ -32,19 +51,24 @@ document.addEventListener("mouseover", (event) => {
         if (currentTargetLink !== link) return;
 
         if (response && response.success) {
-          const formattedCount = formatSubscriberCount(response.subscriberCount);
-          const formattedRegion = formatChannelRegion(response.country);
-          const formattedVideoCount = formatCount(response.videoCount, "部");
-          const formattedViewCount = formatCount(response.viewCount, "");
-          const formattedPublishedAt = formatPublishedAt(response.publishedAt);
           const cacheTag = response.fromCache ? " (快取)" : "";
-          updateTooltipText(
-            `訂閱者：${formattedCount}${cacheTag}\n` +
-            `影片：${formattedVideoCount}\n` +
-            `觀看：${formattedViewCount}\n` +
-            `地區：${formattedRegion}\n` +
-            `建立：${formattedPublishedAt}`
-          );
+          const lines = [];
+          if (previewSettings.fields.subscriberCount) {
+            lines.push(`訂閱者：${formatSubscriberCount(response.subscriberCount)}${cacheTag}`);
+          }
+          if (previewSettings.fields.videoCount) {
+            lines.push(`影片：${formatCount(response.videoCount, "部")}`);
+          }
+          if (previewSettings.fields.viewCount) {
+            lines.push(`觀看：${formatCount(response.viewCount, "")}`);
+          }
+          if (previewSettings.fields.country) {
+            lines.push(`地區：${formatChannelRegion(response.country)}`);
+          }
+          if (previewSettings.fields.publishedAt) {
+            lines.push(`建立：${formatPublishedAt(response.publishedAt)}`);
+          }
+          updateTooltipText(lines.join("\n") || "尚未選擇顯示欄位");
         } else {
           updateTooltipText(response?.error || "無法取得訂閱數");
         }

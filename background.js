@@ -2,10 +2,31 @@
 
 const API_KEY_STORAGE_KEY = "youtubeApiKey";
 const API_KEY_VALIDATION_CHANNEL_ID = "UC_x5XG1OV2P6uZZ5FSM9Ttw";
-
-// 2. 設定各類資料的快取過期時間（單位毫秒）
-const SUBSCRIBER_CACHE_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
-const VIDEO_VIEW_CACHE_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000;
+const SETTINGS_STORAGE_KEY = "previewSettings";
+const CACHE_KEY_PREFIX = "channelCache:";
+const CHANNEL_FIELDS = [
+  "subscriberCount",
+  "videoCount",
+  "viewCount",
+  "country",
+  "publishedAt"
+];
+const DEFAULT_SETTINGS = {
+  fields: {
+    subscriberCount: true,
+    videoCount: true,
+    viewCount: true,
+    country: true,
+    publishedAt: true
+  },
+  cacheDays: {
+    subscriberCount: 7,
+    videoCount: 30,
+    viewCount: 30,
+    country: -1,
+    publishedAt: -1
+  }
+};
 
 // 監聽來自 Content Script 的訊息
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -16,6 +37,27 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
     // 回傳 true 告知 Chrome 將以非同步（Async）方式呼叫 sendResponse
     return true; 
+  }
+
+  if (request.action === "getPreviewSettings") {
+    getSettings()
+      .then((settings) => sendResponse({ success: true, settings }))
+      .catch((error) => sendResponse({ success: false, error: error.message }));
+    return true;
+  }
+
+  if (request.action === "getCacheInfo") {
+    getCacheInfo()
+      .then((info) => sendResponse({ success: true, ...info }))
+      .catch((error) => sendResponse({ success: false, error: error.message }));
+    return true;
+  }
+
+  if (request.action === "clearCache") {
+    clearCache()
+      .then(() => sendResponse({ success: true }))
+      .catch((error) => sendResponse({ success: false, error: error.message }));
+    return true;
   }
 
   if (request.action === "validateApiKey") {
@@ -51,26 +93,21 @@ async function handleGetSubscriberCount(identifier) {
   }
 
   const now = Date.now();
+  const settings = await getSettings();
 
   // --- 步驟 A：檢查 chrome.storage 本地快取 ---
-  const cachedData = await chrome.storage.local.get([identifier]);
-  const cacheEntry = cachedData[identifier];
+  const cacheKey = `${CACHE_KEY_PREFIX}${identifier}`;
+  const cachedData = await chrome.storage.local.get([cacheKey, identifier]);
+  const cacheEntry = cachedData[cacheKey] || cachedData[identifier];
 
   if (
     cacheEntry &&
     hasCompleteChannelData(cacheEntry) &&
-    now - cacheEntry.subscriberCachedAt < SUBSCRIBER_CACHE_EXPIRY_MS &&
-    now - cacheEntry.videoViewCachedAt < VIDEO_VIEW_CACHE_EXPIRY_MS
+    CHANNEL_FIELDS
+      .filter((field) => settings.fields[field])
+      .every((field) => isCacheValid(cacheEntry, field, settings, now))
   ) {
-    return {
-      subscriberCount: cacheEntry.subscriberCount,
-      hiddenSubscriberCount: cacheEntry.hiddenSubscriberCount,
-      country: cacheEntry.country,
-      videoCount: cacheEntry.videoCount,
-      viewCount: cacheEntry.viewCount,
-      publishedAt: cacheEntry.publishedAt,
-      fromCache: true
-    };
+    return createChannelResult(cacheEntry, true);
   }
 
   // --- 步驟 B：無快取或過期，發送 API 請求 ---
@@ -114,28 +151,22 @@ async function handleGetSubscriberCount(identifier) {
   const publishedAt = snippet.publishedAt ?? null;
 
   // --- 步驟 C：將最新數據寫入 chrome.storage 快取 ---
-  await chrome.storage.local.set({
-    [identifier]: {
+  const cacheEntryToStore = {
       subscriberCount: subscriberCount,
       hiddenSubscriberCount: hiddenSubscriberCount,
       country: country,
       videoCount: videoCount,
       viewCount: viewCount,
       publishedAt: publishedAt,
-      subscriberCachedAt: now,
-      videoViewCachedAt: now
-    }
-  });
-
-  return {
-    subscriberCount: subscriberCount,
-    hiddenSubscriberCount: hiddenSubscriberCount,
-    country: country,
-    videoCount: videoCount,
-    viewCount: viewCount,
-    publishedAt: publishedAt,
-    fromCache: false
+      cachedAt: Object.fromEntries(CHANNEL_FIELDS.map((field) => [field, now]))
   };
+  if (CHANNEL_FIELDS.some((field) => settings.cacheDays[field] !== 0)) {
+    await chrome.storage.local.set({ [cacheKey]: cacheEntryToStore });
+  } else {
+    await chrome.storage.local.remove(cacheKey);
+  }
+
+  return createChannelResult(cacheEntryToStore, false);
 }
 
 function hasCompleteChannelData(cacheEntry) {
@@ -146,9 +177,74 @@ function hasCompleteChannelData(cacheEntry) {
     "videoCount",
     "viewCount",
     "publishedAt",
-    "subscriberCachedAt",
-    "videoViewCachedAt"
+    "cachedAt"
   ].every((field) => Object.prototype.hasOwnProperty.call(cacheEntry, field));
+}
+
+function createChannelResult(cacheEntry, fromCache) {
+  return {
+    subscriberCount: cacheEntry.subscriberCount,
+    hiddenSubscriberCount: cacheEntry.hiddenSubscriberCount,
+    country: cacheEntry.country,
+    videoCount: cacheEntry.videoCount,
+    viewCount: cacheEntry.viewCount,
+    publishedAt: cacheEntry.publishedAt,
+    fromCache
+  };
+}
+
+function isCacheValid(cacheEntry, field, settings, now) {
+  const days = settings.cacheDays[field];
+  if (days === -1) return true;
+  if (!days) return false;
+  const cachedAt = cacheEntry.cachedAt?.[field] || cacheEntry[`${field}CachedAt`];
+  return Number.isFinite(cachedAt) && now - cachedAt < days * 24 * 60 * 60 * 1000;
+}
+
+async function getSettings() {
+  const stored = await chrome.storage.local.get(SETTINGS_STORAGE_KEY);
+  return normalizeSettings(stored[SETTINGS_STORAGE_KEY]);
+}
+
+function normalizeSettings(settings) {
+  const result = {
+    fields: { ...DEFAULT_SETTINGS.fields, ...(settings?.fields || {}) },
+    cacheDays: { ...DEFAULT_SETTINGS.cacheDays, ...(settings?.cacheDays || {}) }
+  };
+  CHANNEL_FIELDS.forEach((field) => {
+    result.fields[field] = result.fields[field] !== false;
+    const days = Number(result.cacheDays[field]);
+    const allowedDays = ["country", "publishedAt"].includes(field)
+      ? [0, -1]
+      : [0, 1, 3, 7, 30];
+    result.cacheDays[field] = allowedDays.includes(days)
+      ? days
+      : DEFAULT_SETTINGS.cacheDays[field];
+  });
+  return result;
+}
+
+function isCacheEntry(value) {
+  return value && typeof value === "object" && (
+    Object.prototype.hasOwnProperty.call(value, "cachedAt") ||
+    Object.prototype.hasOwnProperty.call(value, "subscriberCachedAt")
+  );
+}
+
+async function getCacheInfo() {
+  const allData = await chrome.storage.local.get(null);
+  const keys = Object.keys(allData).filter((key) => isCacheEntry(allData[key]));
+  const bytes = keys.reduce(
+    (total, key) => total + new Blob([JSON.stringify({ [key]: allData[key] })]).size,
+    0
+  );
+  return { bytes, entries: keys.length };
+}
+
+async function clearCache() {
+  const allData = await chrome.storage.local.get(null);
+  const keys = Object.keys(allData).filter((key) => isCacheEntry(allData[key]));
+  if (keys.length) await chrome.storage.local.remove(keys);
 }
 
 async function createApiError(response) {
