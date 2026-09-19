@@ -33,9 +33,14 @@ async function handleGetSubscriberCount(identifier) {
   const cachedData = await chrome.storage.local.get([identifier]);
   const cacheEntry = cachedData[identifier];
 
-  if (cacheEntry && (now - cacheEntry.timestamp < CACHE_EXPIRY_MS)) {
+  if (
+    cacheEntry &&
+    Object.prototype.hasOwnProperty.call(cacheEntry, "country") &&
+    now - cacheEntry.timestamp < CACHE_EXPIRY_MS
+  ) {
     return {
       subscriberCount: cacheEntry.subscriberCount,
+      country: cacheEntry.country,
       fromCache: true
     };
   }
@@ -45,11 +50,11 @@ async function handleGetSubscriberCount(identifier) {
 
   if (identifier.startsWith("UC")) {
     // 頻道 Channel ID
-    apiUrl = `https://www.googleapis.com/youtube/v3/channels?part=statistics&id=${identifier}&key=${API_KEY}`;
+    apiUrl = `https://www.googleapis.com/youtube/v3/channels?part=snippet%2Cstatistics&id=${identifier}&key=${API_KEY}`;
   } else {
     // 頻道 Handle (例如 @ChannelName)
     const handle = identifier.startsWith("@") ? identifier : `@${identifier}`;
-    apiUrl = `https://www.googleapis.com/youtube/v3/channels?part=statistics&forHandle=${encodeURIComponent(handle)}&key=${API_KEY}`;
+    apiUrl = `https://www.googleapis.com/youtube/v3/channels?part=snippet%2Cstatistics&forHandle=${encodeURIComponent(handle)}&key=${API_KEY}`;
   }
 
   const response = await fetch(apiUrl);
@@ -63,17 +68,20 @@ async function handleGetSubscriberCount(identifier) {
   }
 
   const subscriberCount = data.items[0].statistics.subscriberCount;
+  const country = data.items[0].snippet?.country || null;
 
   // --- 步驟 C：將最新數據寫入 chrome.storage 快取 ---
   await chrome.storage.local.set({
     [identifier]: {
       subscriberCount: subscriberCount,
+      country: country,
       timestamp: now
     }
   });
 
   return {
     subscriberCount: subscriberCount,
+    country: country,
     fromCache: false
   };
 }

@@ -32,8 +32,11 @@ document.addEventListener("mouseover", (event) => {
 
         if (response && response.success) {
           const formattedCount = formatSubscriberCount(response.subscriberCount);
+          const formattedRegion = formatChannelRegion(response.country);
           const cacheTag = response.fromCache ? " (快取)" : "";
-          updateTooltipText(`訂閱者：${formattedCount}${cacheTag}`);
+          updateTooltipText(
+            `訂閱者：${formattedCount}${cacheTag}\n地區：${formattedRegion}`
+          );
         } else {
           updateTooltipText("無法取得訂閱數");
         }
@@ -138,4 +141,20 @@ function formatSubscriberCount(countStr) {
     notation: "compact",
     maximumFractionDigits: 1
   }).format(num);
+}
+
+/**
+ * 將 API 回傳的 ISO 3166-1 國家代碼轉為繁體中文地區名稱
+ */
+function formatChannelRegion(countryCode) {
+  if (!countryCode) return "未公開";
+
+  try {
+    return (
+      new Intl.DisplayNames(["zh-TW"], { type: "region" }).of(countryCode) ||
+      countryCode
+    );
+  } catch (e) {
+    return countryCode;
+  }
 }
