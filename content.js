@@ -46,7 +46,7 @@ document.addEventListener("mouseover", (event) => {
             `建立：${formattedPublishedAt}`
           );
         } else {
-          updateTooltipText("無法取得訂閱數");
+          updateTooltipText(response?.error || "無法取得訂閱數");
         }
       }
     );

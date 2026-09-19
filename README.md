@@ -4,7 +4,9 @@
 
 ## 版本
 
-- **v1.1**：目前版本，包含頻道地區、影片數量、總觀看次數與建立日期預覽。
+- **v1.3**：目前版本，新增 Options 頁面的 API Key 驗證功能，並改善少見 API 配額與權限錯誤提示。
+- **v1.2**：新增 Options 設定頁，可在不將 API Key 寫入程式碼的情況下使用擴充功能，並改善 API 錯誤提示。
+- **v1.1**：包含頻道地區、影片數量、總觀看次數與建立日期預覽。
 - **v1.0**：支援頻道 Handle 與 Channel ID，查詢並快取訂閱者數量，提供滑鼠懸停預覽。
 
 ## 功能
@@ -16,15 +18,18 @@
 - 顯示影片數量、頻道總觀看次數與頻道建立日期。
 - 將所有查詢結果儲存在 Chrome 本機儲存空間；訂閱數快取 7 天，影片數量與總觀看次數快取 30 天，地區與建立日期不設過期時間。
 - 以繁體中文及易讀格式顯示頻道資料；未公開或缺少的欄位會顯示「未公開」。
+- API Key 由 Options 頁面設定，儲存在 Chrome 的本機儲存空間，不會寫入 GitHub 專案檔案。
 
 ## 安裝方式
 
-1. 取得 YouTube Data API v3 的 API Key。
-2. 開啟 `background.js`，將 `API_KEY` 替換成自己的 API Key。
-3. 在 Chrome 開啟 `chrome://extensions/`。
-4. 開啟右上角的「開發人員模式」。
-5. 點選「載入解壓縮擴充功能」，選取本專案資料夾。
+1. 在 Google Cloud Console 建立 YouTube Data API v3 的 API Key，並限制只能使用 YouTube Data API v3。若設定「應用程式限制」，未封裝 Chrome 擴充功能通常不適用 HTTP referrer 限制，請先選「無」；仍應保留 API 限制與配額限制。
+2. 在 Chrome 開啟 `chrome://extensions/`。
+3. 開啟右上角的「開發人員模式」。
+4. 點選「載入解壓縮擴充功能」，選取本專案資料夾。
+5. 在擴充功能的「詳細資料」中開啟「擴充功能選項」，貼上 API Key，按「驗證 API Key」確認設定後再按「儲存」。
 6. 開啟或重新整理 YouTube 頁面，將滑鼠移到頻道連結上測試。
+
+更新程式碼後，請在 `chrome://extensions/` 找到本擴充功能並按下「重新載入」，讓 Chrome 套用新的版本與程式碼。
 
 ## 使用方式
 
@@ -35,14 +40,16 @@
 | 檔案 | 用途 |
 | --- | --- |
 | `manifest.json` | Chrome 擴充功能設定與權限 |
-| `background.js` | 呼叫 YouTube Data API，並管理訂閱數快取 |
+| `background.js` | 從本機設定讀取 API Key、呼叫 YouTube Data API，並管理訂閱數快取 |
 | `content.js` | 偵測頻道連結、處理滑鼠事件與建立提示框 |
 | `styles.css` | 提示框的外觀與動畫 |
+| `options.html` / `options.js` | 設定、驗證、儲存與清除 API Key |
 
 ## 注意事項
 
 - YouTube Data API 有配額限制；本擴充功能將所有查詢結果快取，訂閱數 7 天後、影片數量與總觀看次數 30 天後才重新查詢，降低 API 請求次數。
-- API Key 會放在瀏覽器擴充功能程式碼中，請在 Google Cloud Console 限制 API Key 僅能使用 YouTube Data API，並依部署方式設定適當的限制。
-- 若 API Key 無效、超過配額或找不到頻道，提示框會顯示無法取得訂閱數；個別欄位未公開時仍會顯示其他可用資料。
+- API Key 不會放在 GitHub 或擴充功能程式碼中，而是儲存在 Chrome 的 `chrome.storage.local`。請在 Google Cloud Console 限制 API Key 僅能使用 YouTube Data API，並設定適當的配額與限制。
+- 若 API Key 無效、限制不相容、超過配額或找不到頻道，提示框會顯示可診斷的錯誤；個別欄位未公開時仍會顯示其他可用資料。
+- 若看到 API 請求失敗，請先開啟擴充功能的 Options 頁確認 API Key，並確認 Google Cloud 已啟用 YouTube Data API v3；未封裝擴充功能不應使用 HTTP referrer 應用程式限制。
 - 手動驗證時，應確認零訂閱數、零影片數、隱藏訂閱數與缺少頻道地區等資料，分別正確顯示為 `0` 或「未公開」。
 - YouTube 可能調整頁面結構，導致頻道連結偵測需要更新。
