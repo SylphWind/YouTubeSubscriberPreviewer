@@ -1,7 +1,6 @@
 // background.js
 
-// 1. 請替換為你的 Google Cloud YouTube Data API Key
-const API_KEY = "AIzaSyD6ePkaw8CVap70by11vIhglAKy40M_IlQ"; 
+const API_KEY_STORAGE_KEY = "youtubeApiKey";
 
 // 2. 設定各類資料的快取過期時間（單位毫秒）
 const SUBSCRIBER_CACHE_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
@@ -52,20 +51,45 @@ async function handleGetSubscriberCount(identifier) {
   }
 
   // --- 步驟 B：無快取或過期，發送 API 請求 ---
+  const storedConfig = await chrome.storage.local.get(API_KEY_STORAGE_KEY);
+  const apiKey = storedConfig[API_KEY_STORAGE_KEY]?.trim();
+  if (!apiKey) {
+    throw new Error("尚未設定 API Key，請開啟擴充功能選項頁設定");
+  }
+
   let apiUrl = "";
 
   if (identifier.startsWith("UC")) {
     // 頻道 Channel ID
-    apiUrl = `https://www.googleapis.com/youtube/v3/channels?part=snippet%2Cstatistics&id=${identifier}&key=${API_KEY}`;
+    apiUrl = `https://www.googleapis.com/youtube/v3/channels?part=snippet%2Cstatistics&id=${identifier}&key=${encodeURIComponent(apiKey)}`;
   } else {
     // 頻道 Handle (例如 @ChannelName)
     const handle = identifier.startsWith("@") ? identifier : `@${identifier}`;
-    apiUrl = `https://www.googleapis.com/youtube/v3/channels?part=snippet%2Cstatistics&forHandle=${encodeURIComponent(handle)}&key=${API_KEY}`;
+    apiUrl = `https://www.googleapis.com/youtube/v3/channels?part=snippet%2Cstatistics&forHandle=${encodeURIComponent(handle)}&key=${encodeURIComponent(apiKey)}`;
   }
 
   const response = await fetch(apiUrl);
   if (!response.ok) {
-    throw new Error(`API 請求失敗，狀態碼：${response.status}`);
+    let apiError;
+    try {
+      apiError = await response.json();
+    } catch {
+      apiError = null;
+    }
+
+    const reason = apiError?.error?.errors?.[0]?.reason;
+    const messageByReason = {
+      keyInvalid: "API Key 無效，請確認選項頁中的 Key 是否正確",
+      dailyLimitExceeded: "YouTube API 今日配額已用完",
+      quotaExceeded: "YouTube API 配額已用完",
+      accessNotConfigured: "Google Cloud 尚未啟用 YouTube Data API v3",
+      ipRefererBlocked:
+        "API Key 的應用程式限制不允許 Chrome 擴充功能，請移除 HTTP referrer 限制"
+    };
+    throw new Error(
+      messageByReason[reason] ||
+        `API 請求失敗，狀態碼：${response.status}${reason ? `（${reason}）` : ""}`
+    );
   }
 
   const data = await response.json();
