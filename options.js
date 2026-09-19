@@ -26,6 +26,27 @@ document.querySelector("#save").addEventListener("click", async () => {
   }
 });
 
+document.querySelector("#validate").addEventListener("click", async () => {
+  const apiKey = apiKeyInput.value.trim();
+  if (!apiKey) {
+    status.textContent = "請先輸入 API Key";
+    return;
+  }
+
+  status.textContent = "正在驗證 API Key...";
+  try {
+    const response = await chrome.runtime.sendMessage({
+      action: "validateApiKey",
+      apiKey
+    });
+    status.textContent = response?.success
+      ? "API Key 有效"
+      : response?.error || "API Key 驗證失敗";
+  } catch {
+    status.textContent = "API Key 驗證失敗，請重新載入選項頁";
+  }
+});
+
 document.querySelector("#clear").addEventListener("click", async () => {
   try {
     await chrome.storage.local.remove(API_KEY_STORAGE_KEY);

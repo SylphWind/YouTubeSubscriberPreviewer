@@ -1,6 +1,7 @@
 // background.js
 
 const API_KEY_STORAGE_KEY = "youtubeApiKey";
+const API_KEY_VALIDATION_CHANNEL_ID = "UC_x5XG1OV2P6uZZ5FSM9Ttw";
 
 // 2. 設定各類資料的快取過期時間（單位毫秒）
 const SUBSCRIBER_CACHE_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
@@ -15,6 +16,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
     // 回傳 true 告知 Chrome 將以非同步（Async）方式呼叫 sendResponse
     return true; 
+  }
+
+  if (request.action === "validateApiKey") {
+    validateApiKey(request.apiKey)
+      .then(() => sendResponse({ success: true }))
+      .catch((error) => sendResponse({ success: false, error: error.message }));
+    return true;
   }
 });
 
@@ -70,6 +78,25 @@ async function handleGetSubscriberCount(identifier) {
 
   const response = await fetch(apiUrl);
   if (!response.ok) {
+    throw await createApiError(response);
+  }
+
+  async function validateApiKey(apiKey) {
+    const normalizedApiKey = apiKey?.trim();
+    if (!normalizedApiKey) {
+      throw new Error("請先輸入 API Key");
+    }
+
+    const apiUrl =
+      `https://www.googleapis.com/youtube/v3/channels?part=id&id=${API_KEY_VALIDATION_CHANNEL_ID}` +
+      `&key=${encodeURIComponent(normalizedApiKey)}`;
+    const response = await fetch(apiUrl);
+    if (!response.ok) {
+      throw await createApiError(response);
+    }
+  }
+
+  async function createApiError(response) {
     let apiError;
     try {
       apiError = await response.json();
@@ -82,11 +109,14 @@ async function handleGetSubscriberCount(identifier) {
       keyInvalid: "API Key 無效，請確認選項頁中的 Key 是否正確",
       dailyLimitExceeded: "YouTube API 今日配額已用完",
       quotaExceeded: "YouTube API 配額已用完",
+      rateLimitExceeded: "YouTube API 請求過於頻繁，請稍後再試",
       accessNotConfigured: "Google Cloud 尚未啟用 YouTube Data API v3",
       ipRefererBlocked:
-        "API Key 的應用程式限制不允許 Chrome 擴充功能，請移除 HTTP referrer 限制"
+        "API Key 的應用程式限制不允許 Chrome 擴充功能，請移除 HTTP referrer 限制",
+      forbidden:
+        "API Key 沒有權限使用 YouTube Data API，請檢查 API 限制設定"
     };
-    throw new Error(
+    return new Error(
       messageByReason[reason] ||
         `API 請求失敗，狀態碼：${response.status}${reason ? `（${reason}）` : ""}`
     );
