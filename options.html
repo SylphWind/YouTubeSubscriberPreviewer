@@ -23,11 +23,49 @@
         font-weight: 600;
       }
 
+      fieldset {
+        margin: 24px 0 0;
+        padding: 16px;
+      }
+
+      .settings-table {
+        width: 100%;
+        margin-top: 24px;
+        border-collapse: collapse;
+      }
+
+      .settings-table th,
+      .settings-table td {
+        padding: 10px 8px;
+        border-bottom: 1px solid #dadce0;
+        text-align: left;
+      }
+
+      .settings-table th:not(:first-child),
+      .settings-table td:not(:first-child) {
+        text-align: center;
+      }
+
+      .settings-table select {
+        margin-left: 0;
+      }
+
+      select {
+        margin-left: 8px;
+        padding: 4px;
+        font: inherit;
+      }
+
       input {
         box-sizing: border-box;
         width: 100%;
         padding: 10px;
         font: inherit;
+      }
+
+      input[type="checkbox"] {
+        width: auto;
+        padding: 0;
       }
 
       button {
@@ -48,9 +86,48 @@
     <p>請輸入 Google Cloud Console 的 YouTube Data API v3 API Key。Key 只會儲存在這個瀏覽器的擴充功能本機儲存空間。</p>
     <label for="api-key">API Key</label>
     <input id="api-key" type="password" autocomplete="off" spellcheck="false">
-    <button id="save" type="button">儲存</button>
     <button id="validate" type="button">驗證 API Key</button>
     <button id="clear" type="button">清除</button>
+    <table class="settings-table">
+      <caption>提示框顯示欄位與快取保留天數</caption>
+      <thead>
+        <tr>
+          <th scope="col">欄位</th>
+          <th scope="col">顯示</th>
+          <th scope="col">快取保留</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th scope="row">訂閱者</th>
+          <td><input type="checkbox" data-field="subscriberCount" aria-label="顯示訂閱者"></td>
+          <td><select data-cache-field="subscriberCount" aria-label="訂閱者快取保留"></select></td>
+        </tr>
+        <tr>
+          <th scope="row">影片</th>
+          <td><input type="checkbox" data-field="videoCount" aria-label="顯示影片"></td>
+          <td><select data-cache-field="videoCount" aria-label="影片快取保留"></select></td>
+        </tr>
+        <tr>
+          <th scope="row">觀看</th>
+          <td><input type="checkbox" data-field="viewCount" aria-label="顯示觀看"></td>
+          <td><select data-cache-field="viewCount" aria-label="觀看快取保留"></select></td>
+        </tr>
+        <tr>
+          <th scope="row">地區</th>
+          <td><input type="checkbox" data-field="country" aria-label="顯示地區"></td>
+          <td><select data-cache-field="country" aria-label="地區快取保留"></select></td>
+        </tr>
+        <tr>
+          <th scope="row">建立日期</th>
+          <td><input type="checkbox" data-field="publishedAt" aria-label="顯示建立日期"></td>
+          <td><select data-cache-field="publishedAt" aria-label="建立日期快取保留"></select></td>
+        </tr>
+      </tbody>
+    </table>
+    <p>目前快取使用空間：<strong id="cache-size">讀取中...</strong>（<span id="cache-entries">0</span> 筆）</p>
+    <button id="clear-cache" type="button">清除所有快取</button>
+    <button id="save" type="button">儲存所有設定</button>
     <p id="status" role="status" aria-live="polite"></p>
     <script src="options.js"></script>
   </body>
