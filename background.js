@@ -26,6 +26,21 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
+async function validateApiKey(apiKey) {
+  const normalizedApiKey = apiKey?.trim();
+  if (!normalizedApiKey) {
+    throw new Error("請先輸入 API Key");
+  }
+
+  const apiUrl =
+    `https://www.googleapis.com/youtube/v3/channels?part=id&id=${API_KEY_VALIDATION_CHANNEL_ID}` +
+    `&key=${encodeURIComponent(normalizedApiKey)}`;
+  const response = await fetch(apiUrl);
+  if (!response.ok) {
+    throw await createApiError(response);
+  }
+}
+
 /**
  * 處理訂閱數查詢與快取邏輯
  * @param {string} identifier 頻道識別碼 (例如: "@username" 或 "UCxxx")
@@ -81,47 +96,6 @@ async function handleGetSubscriberCount(identifier) {
     throw await createApiError(response);
   }
 
-  async function validateApiKey(apiKey) {
-    const normalizedApiKey = apiKey?.trim();
-    if (!normalizedApiKey) {
-      throw new Error("請先輸入 API Key");
-    }
-
-    const apiUrl =
-      `https://www.googleapis.com/youtube/v3/channels?part=id&id=${API_KEY_VALIDATION_CHANNEL_ID}` +
-      `&key=${encodeURIComponent(normalizedApiKey)}`;
-    const response = await fetch(apiUrl);
-    if (!response.ok) {
-      throw await createApiError(response);
-    }
-  }
-
-  async function createApiError(response) {
-    let apiError;
-    try {
-      apiError = await response.json();
-    } catch {
-      apiError = null;
-    }
-
-    const reason = apiError?.error?.errors?.[0]?.reason;
-    const messageByReason = {
-      keyInvalid: "API Key 無效，請確認選項頁中的 Key 是否正確",
-      dailyLimitExceeded: "YouTube API 今日配額已用完",
-      quotaExceeded: "YouTube API 配額已用完",
-      rateLimitExceeded: "YouTube API 請求過於頻繁，請稍後再試",
-      accessNotConfigured: "Google Cloud 尚未啟用 YouTube Data API v3",
-      ipRefererBlocked:
-        "API Key 的應用程式限制不允許 Chrome 擴充功能，請移除 HTTP referrer 限制",
-      forbidden:
-        "API Key 沒有權限使用 YouTube Data API，請檢查 API 限制設定"
-    };
-    return new Error(
-      messageByReason[reason] ||
-        `API 請求失敗，狀態碼：${response.status}${reason ? `（${reason}）` : ""}`
-    );
-  }
-
   const data = await response.json();
   if (!data.items || data.items.length === 0) {
     throw new Error("未找到該頻道的統計資料");
@@ -175,4 +149,30 @@ function hasCompleteChannelData(cacheEntry) {
     "subscriberCachedAt",
     "videoViewCachedAt"
   ].every((field) => Object.prototype.hasOwnProperty.call(cacheEntry, field));
+}
+
+async function createApiError(response) {
+  let apiError;
+  try {
+    apiError = await response.json();
+  } catch {
+    apiError = null;
+  }
+
+  const reason = apiError?.error?.errors?.[0]?.reason;
+  const messageByReason = {
+    keyInvalid: "API Key 無效，請確認選項頁中的 Key 是否正確",
+    dailyLimitExceeded: "YouTube API 今日配額已用完",
+    quotaExceeded: "YouTube API 配額已用完",
+    rateLimitExceeded: "YouTube API 請求過於頻繁，請稍後再試",
+    accessNotConfigured: "Google Cloud 尚未啟用 YouTube Data API v3",
+    ipRefererBlocked:
+      "API Key 的應用程式限制不允許 Chrome 擴充功能，請移除 HTTP referrer 限制",
+    forbidden:
+      "API Key 沒有權限使用 YouTube Data API，請檢查 API 限制設定"
+  };
+  return new Error(
+    messageByReason[reason] ||
+      `API 請求失敗，狀態碼：${response.status}${reason ? `（${reason}）` : ""}`
+  );
 }
