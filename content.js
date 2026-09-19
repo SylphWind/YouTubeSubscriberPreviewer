@@ -2,6 +2,7 @@
 
 let hoverTimer = null;
 let activeTooltip = null;
+let activeTooltipTarget = null;
 let currentTargetLink = null;
 
 // 1. 使用全域 mouseover 事件委派，自動相容 YouTube SPA 動態渲染的 DOM
@@ -33,9 +34,16 @@ document.addEventListener("mouseover", (event) => {
         if (response && response.success) {
           const formattedCount = formatSubscriberCount(response.subscriberCount);
           const formattedRegion = formatChannelRegion(response.country);
+          const formattedVideoCount = formatCount(response.videoCount, "部");
+          const formattedViewCount = formatCount(response.viewCount, "");
+          const formattedPublishedAt = formatPublishedAt(response.publishedAt);
           const cacheTag = response.fromCache ? " (快取)" : "";
           updateTooltipText(
-            `訂閱者：${formattedCount}${cacheTag}\n地區：${formattedRegion}`
+            `訂閱者：${formattedCount}${cacheTag}\n` +
+            `影片：${formattedVideoCount}\n` +
+            `觀看：${formattedViewCount}\n` +
+            `地區：${formattedRegion}\n` +
+            `建立：${formattedPublishedAt}`
           );
         } else {
           updateTooltipText("無法取得訂閱數");
@@ -90,10 +98,18 @@ function showTooltip(targetElement, text) {
   // 插入至 document.body 避免受父元素 overflow: hidden 影響
   document.body.appendChild(tooltip);
   activeTooltip = tooltip;
+  activeTooltipTarget = targetElement;
+
+  positionTooltip();
+  tooltip.classList.add("yt-sub-preview-show");
+}
+
+function positionTooltip() {
+  if (!activeTooltip || !activeTooltipTarget) return;
 
   // 取得連結與 Tooltip 的像素尺寸
-  const rect = targetElement.getBoundingClientRect();
-  const tooltipRect = tooltip.getBoundingClientRect();
+  const rect = activeTooltipTarget.getBoundingClientRect();
+  const tooltipRect = activeTooltip.getBoundingClientRect();
 
   // 計算座標 (預設顯示在連結正上方，水平置中)
   let top = rect.top - tooltipRect.height - 8;
@@ -112,14 +128,14 @@ function showTooltip(targetElement, text) {
     left = 10;
   }
 
-  tooltip.style.top = `${top}px`;
-  tooltip.style.left = `${left}px`;
-  tooltip.classList.add("yt-sub-preview-show");
+  activeTooltip.style.top = `${top}px`;
+  activeTooltip.style.left = `${left}px`;
 }
 
 function updateTooltipText(text) {
   if (activeTooltip) {
     activeTooltip.innerText = text;
+    positionTooltip();
   }
 }
 
@@ -127,6 +143,7 @@ function removeTooltip() {
   if (activeTooltip) {
     activeTooltip.remove();
     activeTooltip = null;
+    activeTooltipTarget = null;
   }
 }
 
@@ -135,12 +152,37 @@ function removeTooltip() {
  */
 function formatSubscriberCount(countStr) {
   const num = parseInt(countStr, 10);
-  if (isNaN(num)) return countStr;
+  if (isNaN(num)) return "未公開";
 
   return new Intl.NumberFormat("zh-TW", {
     notation: "compact",
     maximumFractionDigits: 1
   }).format(num);
+}
+
+function formatCount(countStr, suffix) {
+  const num = parseInt(countStr, 10);
+  if (isNaN(num)) return "未公開";
+
+  return (
+    new Intl.NumberFormat("zh-TW", {
+      notation: "compact",
+      maximumFractionDigits: 1
+    }).format(num) + suffix
+  );
+}
+
+function formatPublishedAt(publishedAt) {
+  if (!publishedAt) return "未公開";
+
+  const date = new Date(publishedAt);
+  if (isNaN(date.getTime())) return "未公開";
+
+  return new Intl.DateTimeFormat("zh-TW", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(date);
 }
 
 /**

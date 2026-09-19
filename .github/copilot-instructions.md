@@ -17,8 +17,10 @@ The runtime flow is:
    worker and updates the tooltip only if the pointer is still over the
    original link.
 3. `background.js` checks `chrome.storage.local` first. Entries are keyed by
-   the extracted identifier and expire after seven days. Cache misses call the
-   YouTube Data API v3, then store the subscriber count and timestamp.
+   the extracted identifier and cache all returned channel fields. Subscriber
+   data is refreshed after seven days, video/view counts after 30 days, while
+   region and creation date do not expire. A stale cache miss calls the
+   YouTube Data API v3 and updates the cached channel statistics.
 4. `styles.css` owns the fixed-position tooltip, viewport placement visual
    treatment, and show animation. `manifest.json` wires the content script,
    stylesheet, service worker, storage permission, and YouTube/Google API host
@@ -56,9 +58,15 @@ There is no single-test command because no test runner or test files exist.
   matching when parsing YouTube links. YouTube is an SPA, so prefer delegated
   document events over one-time scans of the DOM.
 - Keep the 300 ms hover debounce, stale-target guard, seven-day cache policy,
-  `country` response field, and `fromCache` response field consistent with the
-  user-visible behavior described in `README.md`. Channel metadata is obtained
-  from the YouTube API `snippet.country` field and may be absent.
+  `country`, `videoCount`, `viewCount`, `publishedAt`, and `fromCache` response
+  fields and their cache timestamps consistent with the user-visible behavior
+  described in `README.md`.
+  Subscriber data expires after seven days; video and view counts expire after
+  30 days; country and published date do not expire.
+  Channel metadata is obtained from the YouTube API `snippet` and `statistics`
+  fields and may be absent or hidden; represent unavailable values as
+  `未公開` in the tooltip. Older cache entries without the complete data set
+  must be refreshed.
 - User-facing text and existing inline documentation are in Traditional
   Chinese (`zh-TW`). Keep new visible strings consistent with that language
   and use `Intl.NumberFormat("zh-TW", { notation: "compact" })` for subscriber
