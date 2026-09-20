@@ -57,3 +57,9 @@
 - 若看到 API 請求失敗，請先開啟擴充功能的 Options 頁確認 API Key，並確認 Google Cloud 已啟用 YouTube Data API v3；未封裝擴充功能不應使用 HTTP referrer 應用程式限制。
 - 手動驗證時，應確認零訂閱數、零影片數、隱藏訂閱數與缺少頻道地區等資料，分別正確顯示為 `0` 或「未公開」。
 - YouTube 可能調整頁面結構，導致頻道連結偵測需要更新。
+
+## 授權
+
+本專案依 [Creative Commons Attribution-NonCommercial 4.0 International（CC BY-NC 4.0）](LICENSE) 授權。你可以在遵守署名及其他授權條款的前提下，重製、修改及分享本專案，但不得將本專案用於商業用途。
+
+使用本擴充功能時仍須遵守 [YouTube API Services Terms of Service](https://developers.google.com/youtube/terms/api-services-terms-of-service) 及其他適用的 YouTube 條款。
